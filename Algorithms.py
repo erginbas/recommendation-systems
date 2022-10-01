@@ -3,7 +3,7 @@ from PyomoSolver import PyomoSolver
 import time
 
 class Algorithms:
-    def __init__(self, R_true, rank, eta, is_dynamic, C, D, T, exp_save_path):
+    def __init__(self, R_true, rank, eta, is_dynamic, C, D, T, exp_save_path, verbose = False):
         self.R_true = R_true
         self.rank = rank
         self.N, self.M = R_true.shape
@@ -14,10 +14,13 @@ class Algorithms:
         self.D = D
         self.exp_save_path = exp_save_path
 
+        self.verbose = verbose
+
         # shift parameter for prices (only to be used if users accept/reject)
         self.nu = 0.5 * (((self.N + self.M) * self.rank * self.eta ** 2)/(self.N * self.M * self.T))**(1/4)
 
-        print("Price shift = ", self.nu)
+        if self.verbose:
+            print("Price shift = ", self.nu)
 
         self.initial_mask = None
         self.opt_rewards = None
@@ -38,19 +41,21 @@ class Algorithms:
             for t in range(self.T):
                 self.x_star[t] = self.solver.solve_system(self.R_true, self.C[t], self.D[t])
                 self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
-                if t % 10 == 0:
+                if t % 10 == 0 and self.verbose:
                     print('solved x_star at ', t, ', optimum value = ', np.sum(self.x_star[t] * self.R_true))
         else:
             for t in range(self.T):
                 if t == 0:
                     self.x_star[0] = self.solver.solve_system(self.R_true, self.C[0], self.D[0])
                     self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
-                    print('solved x_star, optimum value = ', np.sum(self.x_star[t] * self.R_true))
+                    if self.verbose:
+                        print('solved x_star, optimum value = ', np.sum(self.x_star[t] * self.R_true))
                 else:
                     self.x_star[t] = self.x_star[t - 1]
                     self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
 
-        print("Optimum prices = ", self.solver.get_prices())
+        if self.verbose:
+            print("Optimum prices = ", self.solver.get_prices())
 
         np.save(f"{self.exp_save_path}/opt_rewards", self.opt_rewards)
 
@@ -140,7 +145,7 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_UCB, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0:
+            if t % 5 == 0 and self.verbose:
                 print('Iter ', t)
                 print('Social Welfare Regret = ', regrets[t, 0])
                 print('Instability = ', regrets[t, 1])
@@ -176,7 +181,7 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0:
+            if t % 5 == 0 and self.verbose:
                 print('Iter ', t)
                 print('Social Welfare Regret = ', regrets[t, 0])
                 print('Instability = ', regrets[t, 1])
@@ -213,7 +218,7 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_t, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0:
+            if t % 5 == 0 and self.verbose:
                 print('Iter ', t)
                 print('Social Welfare Regret = ', regrets[t, 0])
                 print('Instability = ', regrets[t, 1])
@@ -260,7 +265,7 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0:
+            if t % 5 == 0 and self.verbose:
                 print('Iter ', t)
                 print('Social Welfare Regret = ', regrets[t, 0])
                 print('Instability = ', regrets[t, 1])
@@ -309,7 +314,7 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0:
+            if t % 5 == 0 and self.verbose:
                 print('Iter ', t)
                 print('Social Welfare Regret = ', regrets[t, 0])
                 print('Instability = ', regrets[t, 1])

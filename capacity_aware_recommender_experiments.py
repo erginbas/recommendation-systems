@@ -28,9 +28,11 @@ show_plots = False
 """ number of monte carlo simulations """
 num_sims = 50
 
+"""verbose"""
+verbose = False
+
 
 def run_exp(input):
-
     data_arg = {}
     if dataset == "synthetic":
         T = 500
@@ -55,10 +57,11 @@ def run_exp(input):
     dem_to_cap_ratio = 0.9
     C, D = get_capacity(N, M, T, is_dynamic, dem_to_cap_ratio=dem_to_cap_ratio, p_activity=p_activity)
 
-    # print summary of parameters
-    print("N = ", N, ", M = ", M)
-    print("total C = ", np.sum(C[0]))
-    print("total D = ", np.sum(D[0]))
+    if verbose:
+        # print summary of parameters
+        print("N = ", N, ", M = ", M)
+        print("total C = ", np.sum(C[0]))
+        print("total D = ", np.sum(D[0]))
 
     # save the simulation configutarion
     exp_params = {"N": N, "M": M, "T": T, "dataset": dataset, "rank": rank,
