@@ -1,6 +1,6 @@
 import numpy as np
 from PyomoSolver import PyomoSolver
-
+import time
 
 class Algorithms:
     def __init__(self, R_true, rank, eta, is_dynamic, C, D, T, exp_save_path):
@@ -13,6 +13,11 @@ class Algorithms:
         self.C = C
         self.D = D
         self.exp_save_path = exp_save_path
+
+        # shift parameter for prices (only to be used if users accept/reject)
+        self.nu = 0.5 * (((self.N + self.M) * self.rank * self.eta ** 2)/(self.N * self.M * self.T))**(1/4)
+
+        print("Price shift = ", self.nu)
 
         self.initial_mask = None
         self.opt_rewards = None
@@ -45,7 +50,32 @@ class Algorithms:
                     self.x_star[t] = self.x_star[t - 1]
                     self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
 
+        print("Optimum prices = ", self.solver.get_prices())
+
         np.save(f"{self.exp_save_path}/opt_rewards", self.opt_rewards)
+
+    def calculate_instability(self, t, X, p):
+        best_surplus_list = np.zeros(self.N)
+        total_current_surplus = np.sum(X * (self.R_true - p))
+
+        for u in range(self.N):
+            demand_u = self.D[t, u]
+            ordered_items = np.maximum(np.sort(self.R_true[u, :] - p), 0)
+            best_surplus_list[u] = np.sum(ordered_items[-demand_u:])
+
+        return np.sum(best_surplus_list) - total_current_surplus
+
+    def calculate_regret(self, t, X, p_walrasian, nu):
+        sw_regret = self.opt_rewards[t] - np.sum(X * self.R_true)
+        instability = self.calculate_instability(t, X, p_walrasian)
+
+        p_shifted = p_walrasian - nu
+        accepted_offers = X * (self.R_true > p_shifted)
+        sw_regret_ar = self.opt_rewards[t] - np.sum(accepted_offers * self.R_true)
+        instability_ar = self.calculate_instability(t, accepted_offers, p_shifted)
+
+        return [sw_regret, instability, sw_regret_ar, instability_ar]
+
 
     def generate_initial_mask(self):
         # generate initial mask
@@ -92,7 +122,7 @@ class Algorithms:
 
             return R_UCB + std
 
-        regrets = np.zeros(self.T)
+        regrets = np.zeros((self.T, 4))
 
         # get initial observations
         observations = self.get_observations_gauss(self.initial_mask)
@@ -106,12 +136,17 @@ class Algorithms:
             x_UCB = self.solver.solve_system(R_UCB, self.C[t], self.D[t], x_prev=x_prev)
             x_prev = x_UCB.copy()
 
-            regrets[t] = self.opt_rewards[t] - np.sum(x_UCB * self.R_true)
+            p_wal = self.solver.get_prices()
+            regret_collection = self.calculate_regret(t, x_UCB, p_wal, self.nu)
+            regrets[t] = regret_collection
 
             if t % 5 == 0:
                 print('Iter ', t)
-                print('Regret = ', regrets[t])
-                print()
+                print('Social Welfare Regret = ', regrets[t, 0])
+                print('Instability = ', regrets[t, 1])
+                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
+                print('Instability (A/R) = ', regrets[t, 3])
+                print("", flush=True)
 
             observations = self.get_observations_gauss(x_UCB)
 
@@ -124,7 +159,7 @@ class Algorithms:
         # get initial observations
         observations = self.get_observations_gauss(self.initial_mask)
 
-        regrets = np.zeros(self.T)
+        regrets = np.zeros((self.T, 4))
         x_prev = None
 
         for t in range(self.T):
@@ -137,12 +172,17 @@ class Algorithms:
             x_OFU = self.solve_for_ofu_allocation(U, V, counts, t, x_prev=x_prev)
             x_prev = x_OFU.copy()
 
-            regrets[t] = self.opt_rewards[t] - np.sum(x_OFU * self.R_true)
+            p_wal = self.solver.get_prices()
+            regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
+            regrets[t] = regret_collection
 
             if t % 5 == 0:
                 print('Iter ', t)
-                print('Regret = ', regrets[t])
-                print()
+                print('Social Welfare Regret = ', regrets[t, 0])
+                print('Instability = ', regrets[t, 1])
+                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
+                print('Instability (A/R) = ', regrets[t, 3])
+                print("", flush=True)
 
             observations += self.get_observations_gauss(x_OFU)
 
@@ -154,7 +194,7 @@ class Algorithms:
         # get initial observations
         observations = self.get_observations_gauss(self.initial_mask)
 
-        regrets = np.zeros(self.T)
+        regrets = np.zeros((self.T, 4))
 
         x_prev = None
         U = np.random.randn(self.N, self.rank)
@@ -169,12 +209,17 @@ class Algorithms:
             x_t = self.solver.solve_system(R_est, self.C[t], self.D[t], x_prev=x_prev)
             x_prev = x_t.copy()
 
-            regrets[t] = self.opt_rewards[t] - np.sum(x_t * self.R_true)
+            p_wal = self.solver.get_prices()
+            regret_collection = self.calculate_regret(t, x_t, p_wal, self.nu)
+            regrets[t] = regret_collection
 
             if t % 5 == 0:
                 print('Iter ', t)
-                print('Regret = ', regrets[t])
-                print()
+                print('Social Welfare Regret = ', regrets[t, 0])
+                print('Instability = ', regrets[t, 1])
+                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
+                print('Instability (A/R) = ', regrets[t, 3])
+                print("", flush=True)
 
             observations += self.get_observations_gauss(x_t)
 
@@ -187,7 +232,7 @@ class Algorithms:
         # get initial observations
         observations = self.get_observations_gauss(self.initial_mask)
 
-        regrets = np.zeros(self.T)
+        regrets = np.zeros((self.T, 4))
 
         x_prev = None
 
@@ -211,12 +256,17 @@ class Algorithms:
                     v = np.argmin(temp)
                     x_OFU[v, i] = 0
 
-            regrets[t] = self.opt_rewards[t] - np.sum(x_OFU * self.R_true)
+            p_wal = self.solver.get_prices()
+            regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
+            regrets[t] = regret_collection
 
             if t % 5 == 0:
                 print('Iter ', t)
-                print('Regret = ', regrets[t])
-                print()
+                print('Social Welfare Regret = ', regrets[t, 0])
+                print('Instability = ', regrets[t, 1])
+                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
+                print('Instability (A/R) = ', regrets[t, 3])
+                print("", flush=True)
 
             observations += self.get_observations_gauss(x_OFU)
 
@@ -229,7 +279,7 @@ class Algorithms:
         # get initial observations
         observations = self.get_observations_gauss(self.initial_mask)
 
-        regrets = np.zeros(self.T)
+        regrets = np.zeros((self.T, 4))
 
         x_prev = None
 
@@ -255,12 +305,17 @@ class Algorithms:
 
             x_OFU_uns = x_OFU_intended - x_OFU
 
-            regrets[t] = self.opt_rewards[t] - np.sum(x_OFU * self.R_true)
+            p_wal = self.solver.get_prices()
+            regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
+            regrets[t] = regret_collection
 
             if t % 5 == 0:
                 print('Iter ', t)
-                print('Regret = ', regrets[t])
-                print()
+                print('Social Welfare Regret = ', regrets[t, 0])
+                print('Instability = ', regrets[t, 1])
+                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
+                print('Instability (A/R) = ', regrets[t, 3])
+                print("", flush=True)
 
             observations += self.get_observations_gauss(x_OFU_intended)
             observations + self.get_zero_observations(x_OFU_uns)
@@ -318,7 +373,6 @@ class Algorithms:
         beta += 8 * (self.eta ** 2) * np.log(self.T)
         beta += 16 * t / self.T + 2 * np.sqrt(8 * (self.eta ** 2) * np.log(4 * (self.N ** 2) * (self.T ** 3)))
 
-        print(beta)
         beta = beta * 1e-2
 
         Theta_LS = U @ V.T
@@ -363,7 +417,6 @@ class Algorithms:
                     U_prev = U.copy()
                     U, V = opt_UV(U, V, x)
                     if np.linalg.norm(U - U_prev) < 1e-6:
-                        print(f"broken at iteration {i}, {v}")
                         break
 
                 R = U @ V.T
