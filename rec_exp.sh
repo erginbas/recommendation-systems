@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=erginbas@berkeley.edu
 which python
-python capacity_aware_recommender_experiments.py
+python capacity_aware_recommender_experiments.py $1

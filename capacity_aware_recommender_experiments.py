@@ -8,6 +8,7 @@ from pathlib import Path
 import uuid
 from multiprocessing import Pool
 import itertools
+import logging
 
 from data_utils import get_dataset, get_capacity
 from Algorithms import Algorithms
@@ -29,16 +30,15 @@ show_plots = False
 num_sims = 50
 
 """verbose"""
-verbose = False
-
+verbose = True
 
 def run_exp(input):
     data_arg = {}
     if dataset == "synthetic":
         T = 500
-        data_arg["N"] = 100
-        data_arg["M"] = 30
-        data_arg["rank"] = 5
+        data_arg["N"] = 50
+        data_arg["M"] = 20
+        data_arg["rank"] = 3
     elif dataset == "restaurant":
         T = 100
     elif dataset == "movie":
@@ -57,12 +57,6 @@ def run_exp(input):
     dem_to_cap_ratio = 0.9
     C, D = get_capacity(N, M, T, is_dynamic, dem_to_cap_ratio=dem_to_cap_ratio, p_activity=p_activity)
 
-    if verbose:
-        # print summary of parameters
-        print("N = ", N, ", M = ", M)
-        print("total C = ", np.sum(C[0]))
-        print("total D = ", np.sum(D[0]))
-
     # save the simulation configutarion
     exp_params = {"N": N, "M": M, "T": T, "dataset": dataset, "rank": rank,
                   "C_max": int(np.max(C)), "p_activity": p_activity, "dynamic": int(is_dynamic)}
@@ -72,6 +66,16 @@ def run_exp(input):
     with open(f"{exp_save_path}/params.json", "w") as outfile:
         json.dump(exp_params, outfile)
 
+    logging.basicConfig(filename=f"{exp_save_path}/log.out",
+                        filemode='a',
+                        format='[%(asctime)s] %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging.INFO)
+
+    # print summary of parameters
+    logging.info(f"N = {N},  M = {M}")
+    logging.info(f"total C = {np.sum(C[0])}")
+    logging.info(f"total D = {np.sum(D[0])}")
 
     """
     OFU: allocations with low-rank collaborative filtering (our proposed algorithm)

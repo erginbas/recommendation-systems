@@ -1,6 +1,7 @@
 import numpy as np
 from PyomoSolver import PyomoSolver
 import time
+import logging
 
 class Algorithms:
     def __init__(self, R_true, rank, eta, is_dynamic, C, D, T, exp_save_path, verbose = False):
@@ -14,13 +15,16 @@ class Algorithms:
         self.D = D
         self.exp_save_path = exp_save_path
 
-        self.verbose = verbose
+        logging.basicConfig(filename=f"{exp_save_path}/log.out",
+                            filemode='a',
+                            format='[%(asctime)s] %(message)s',
+                            datefmt='%H:%M:%S',
+                            level=logging.INFO)
 
         # shift parameter for prices (only to be used if users accept/reject)
         self.nu = 0.5 * (((self.N + self.M) * self.rank * self.eta ** 2)/(self.N * self.M * self.T))**(1/4)
 
-        if self.verbose:
-            print("Price shift = ", self.nu)
+        logging.info(f"Price shift = {self.nu}")
 
         self.initial_mask = None
         self.opt_rewards = None
@@ -29,6 +33,7 @@ class Algorithms:
         self.solver = PyomoSolver(self.N, self.M)
         self.find_optimum()
         self.generate_initial_mask()
+
 
 
     def find_optimum(self):
@@ -41,21 +46,19 @@ class Algorithms:
             for t in range(self.T):
                 self.x_star[t] = self.solver.solve_system(self.R_true, self.C[t], self.D[t])
                 self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
-                if t % 10 == 0 and self.verbose:
-                    print('solved x_star at ', t, ', optimum value = ', np.sum(self.x_star[t] * self.R_true))
+                if t % 10 == 0:
+                    logging.info(f'solved x_star at {t}, optimum value = {np.sum(self.x_star[t] * self.R_true)}')
         else:
             for t in range(self.T):
                 if t == 0:
                     self.x_star[0] = self.solver.solve_system(self.R_true, self.C[0], self.D[0])
                     self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
-                    if self.verbose:
-                        print('solved x_star, optimum value = ', np.sum(self.x_star[t] * self.R_true))
+                    logging.info(f'solved x_star, optimum value = {np.sum(self.x_star[t] * self.R_true)}')
                 else:
                     self.x_star[t] = self.x_star[t - 1]
                     self.opt_rewards[t] = np.sum(self.x_star[t] * self.R_true)
 
-        if self.verbose:
-            print("Optimum prices = ", self.solver.get_prices())
+        logging.info(f"Optimum prices = {self.solver.get_prices()}")
 
         np.save(f"{self.exp_save_path}/opt_rewards", self.opt_rewards)
 
@@ -145,13 +148,12 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_UCB, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0 and self.verbose:
-                print('Iter ', t)
-                print('Social Welfare Regret = ', regrets[t, 0])
-                print('Instability = ', regrets[t, 1])
-                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
-                print('Instability (A/R) = ', regrets[t, 3])
-                print("", flush=True)
+            if t % 10 == 0:
+                logging.info(f'Iter {t}')
+                logging.info(f'Social Welfare Regret = {regrets[t, 0]}')
+                logging.info(f'Instability = {regrets[t, 1]}')
+                logging.info(f'Social Welfare Regret (A/R) = {regrets[t, 2]}')
+                logging.info(f'Instability (A/R) = {regrets[t, 3]}')
 
             observations = self.get_observations_gauss(x_UCB)
 
@@ -181,13 +183,12 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0 and self.verbose:
-                print('Iter ', t)
-                print('Social Welfare Regret = ', regrets[t, 0])
-                print('Instability = ', regrets[t, 1])
-                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
-                print('Instability (A/R) = ', regrets[t, 3])
-                print("", flush=True)
+            if t % 10 == 0:
+                logging.info(f'Iter {t}')
+                logging.info(f'Social Welfare Regret = {regrets[t, 0]}')
+                logging.info(f'Instability = {regrets[t, 1]}')
+                logging.info(f'Social Welfare Regret (A/R) = {regrets[t, 2]}')
+                logging.info(f'Instability (A/R) = {regrets[t, 3]}')
 
             observations += self.get_observations_gauss(x_OFU)
 
@@ -218,13 +219,12 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_t, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0 and self.verbose:
-                print('Iter ', t)
-                print('Social Welfare Regret = ', regrets[t, 0])
-                print('Instability = ', regrets[t, 1])
-                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
-                print('Instability (A/R) = ', regrets[t, 3])
-                print("", flush=True)
+            if t % 10 == 0:
+                logging.info(f'Iter {t}')
+                logging.info(f'Social Welfare Regret = {regrets[t, 0]}')
+                logging.info(f'Instability = {regrets[t, 1]}')
+                logging.info(f'Social Welfare Regret (A/R) = {regrets[t, 2]}')
+                logging.info(f'Instability (A/R) = {regrets[t, 3]}')
 
             observations += self.get_observations_gauss(x_t)
 
@@ -265,13 +265,12 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0 and self.verbose:
-                print('Iter ', t)
-                print('Social Welfare Regret = ', regrets[t, 0])
-                print('Instability = ', regrets[t, 1])
-                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
-                print('Instability (A/R) = ', regrets[t, 3])
-                print("", flush=True)
+            if t % 10 == 0:
+                logging.info(f'Iter {t}')
+                logging.info(f'Social Welfare Regret = {regrets[t, 0]}')
+                logging.info(f'Instability = {regrets[t, 1]}')
+                logging.info(f'Social Welfare Regret (A/R) = {regrets[t, 2]}')
+                logging.info(f'Instability (A/R) = {regrets[t, 3]}')
 
             observations += self.get_observations_gauss(x_OFU)
 
@@ -314,13 +313,12 @@ class Algorithms:
             regret_collection = self.calculate_regret(t, x_OFU, p_wal, self.nu)
             regrets[t] = regret_collection
 
-            if t % 5 == 0 and self.verbose:
-                print('Iter ', t)
-                print('Social Welfare Regret = ', regrets[t, 0])
-                print('Instability = ', regrets[t, 1])
-                print('Social Welfare Regret (A/R) = ', regrets[t, 2])
-                print('Instability (A/R) = ', regrets[t, 3])
-                print("", flush=True)
+            if t % 10 == 0:
+                logging.info(f'Iter {t}')
+                logging.info(f'Social Welfare Regret = {regrets[t, 0]}')
+                logging.info(f'Instability = {regrets[t, 1]}')
+                logging.info(f'Social Welfare Regret (A/R) = {regrets[t, 2]}')
+                logging.info(f'Instability (A/R) = {regrets[t, 3]}')
 
             observations += self.get_observations_gauss(x_OFU_intended)
             observations + self.get_zero_observations(x_OFU_uns)
@@ -415,8 +413,8 @@ class Algorithms:
 
         if solve_with_capacity:
             U_prev = np.zeros_like(U)
-            for i in range(5):
-                for v in range(15):
+            for i in range(3):
+                for v in range(10):
                     if np.linalg.norm(U - U_prev) < 1e-6:
                         continue
                     U_prev = U.copy()
@@ -428,7 +426,7 @@ class Algorithms:
 
                 x = self.solver.solve_system(R, self.C[t], self.D[t], x_prev=x_prev)
         else:
-            for v in range(100):
+            for v in range(10):
                 U_prev = U.copy()
                 U, V = opt_UV(U, V, x)
                 if np.linalg.norm(U - U_prev) < 1e-6:
